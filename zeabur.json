@@ -1,0 +1,19 @@
+{
+  "name": "linebot-google-sheets",
+  "services": [
+    {
+      "name": "linebot",
+      "type": "nodejs",
+      "buildCommand": "npm install",
+      "startCommand": "npm start",
+      "env": [
+        "LINE_CHANNEL_ACCESS_TOKEN",
+        "LINE_CHANNEL_SECRET",
+        "GOOGLE_SHEETS_ID",
+        "GOOGLE_SERVICE_ACCOUNT_EMAIL",
+        "GOOGLE_PRIVATE_KEY",
+        "PORT"
+      ]
+    }
+  ]
+}
