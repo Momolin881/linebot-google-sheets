@@ -4,11 +4,13 @@ require('dotenv').config();
 
 class GoogleSheetsService {
   constructor() {
+    // 解碼 BASE64 編碼的 credentials.json
+    const credentialsBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+    const credentialsJson = Buffer.from(credentialsBase64, 'base64').toString('utf-8');
+    const credentials = JSON.parse(credentialsJson);
+    
     this.auth = new GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      },
+      credentials: credentials,
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
     

@@ -42,14 +42,24 @@ LINE_CHANNEL_SECRET=你的_line_channel_secret
 
 # Google Sheets 設定
 GOOGLE_SHEETS_ID=你的_google_sheets_id
-GOOGLE_SERVICE_ACCOUNT_EMAIL=service-account@your-project.iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
-你的_private_key
------END PRIVATE KEY-----"
+GOOGLE_SERVICE_ACCOUNT_KEY=你的_base64_encoded_credentials_json
 
 # 伺服器設定
 PORT=3000
 ```
+
+#### 如何產生 BASE64 編碼的 credentials.json：
+
+在終端機執行以下命令：
+```bash
+# macOS/Linux
+base64 -i path/to/your/credentials.json
+
+# 或使用 Node.js
+node -e "console.log(Buffer.from(require('fs').readFileSync('path/to/credentials.json')).toString('base64'))"
+```
+
+將輸出的 BASE64 字串複製到 `GOOGLE_SERVICE_ACCOUNT_KEY` 環境變數中。
 
 ### 4. 本地測試
 
@@ -78,8 +88,7 @@ npm start
 - `LINE_CHANNEL_ACCESS_TOKEN`
 - `LINE_CHANNEL_SECRET`
 - `GOOGLE_SHEETS_ID`
-- `GOOGLE_SERVICE_ACCOUNT_EMAIL`
-- `GOOGLE_PRIVATE_KEY`
+- `GOOGLE_SERVICE_ACCOUNT_KEY` (BASE64 編碼的 credentials.json)
 - `PORT` (通常設為 3000)
 
 ### 6. LINE Bot Webhook 設定
