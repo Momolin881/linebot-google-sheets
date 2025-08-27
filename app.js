@@ -1,6 +1,7 @@
 const express = require('express');
 const line = require('@line/bot-sdk');
-const GoogleSheetsService = require('./googleSheets');
+// 暫時註解掉 Google Sheets 測試 LINE Bot
+// const GoogleSheetsService = require('./googleSheets');
 require('dotenv').config();
 
 const app = express();
@@ -13,10 +14,10 @@ const config = {
 };
 
 const client = new line.Client(config);
-const googleSheetsService = new GoogleSheetsService();
+// const googleSheetsService = new GoogleSheetsService();
 
 // 初始化 Google Sheets
-googleSheetsService.initializeSheet();
+// googleSheetsService.initializeSheet();
 
 // 處理 LINE Bot webhook
 async function handleEvent(event) {
@@ -28,21 +29,17 @@ async function handleEvent(event) {
     // 取得使用者資訊
     const profile = await client.getProfile(event.source.userId);
     
-    // 準備要儲存的資料
-    const data = {
+    // 暫時註解掉 Google Sheets，先測試 LINE Bot 回覆
+    console.log('收到訊息:', {
       userId: event.source.userId,
       userName: profile.displayName || '未知使用者',
       message: event.message.text
-    };
+    });
 
-    // 儲存到 Google Sheets
-    await googleSheetsService.appendData(data);
-    console.log('訊息已儲存到 Google Sheets:', data);
-
-    // 回覆確認訊息
+    // 簡單回覆測試
     const echo = {
       type: 'text',
-      text: `✅ 已成功儲存您的訊息：\n"${event.message.text}"`
+      text: `🤖 LINE Bot 連接成功！\n收到您的訊息：${event.message.text}\n\n來自：${profile.displayName}`
     };
 
     return client.replyMessage(event.replyToken, echo);
@@ -52,7 +49,7 @@ async function handleEvent(event) {
     // 回覆錯誤訊息
     const errorMessage = {
       type: 'text',
-      text: '❌ 儲存訊息時發生錯誤，請稍後再試。'
+      text: '❌ LINE Bot 設定有問題，請檢查 token 和 secret'
     };
     
     return client.replyMessage(event.replyToken, errorMessage);
