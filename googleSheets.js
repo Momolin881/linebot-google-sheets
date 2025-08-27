@@ -4,10 +4,20 @@ require('dotenv').config();
 
 class GoogleSheetsService {
   constructor() {
-    // 解碼 BASE64 編碼的 credentials.json
+    // 檢查環境變數
     const credentialsBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-    const credentialsJson = Buffer.from(credentialsBase64, 'base64').toString('utf-8');
-    const credentials = JSON.parse(credentialsJson);
+    if (!credentialsBase64) {
+      throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY 環境變數未設定');
+    }
+
+    // 解碼 BASE64 編碼的 credentials.json
+    let credentials;
+    try {
+      const credentialsJson = Buffer.from(credentialsBase64, 'base64').toString('utf-8');
+      credentials = JSON.parse(credentialsJson);
+    } catch (error) {
+      throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY 格式錯誤: ' + error.message);
+    }
     
     this.auth = new GoogleAuth({
       credentials: credentials,
