@@ -57,7 +57,7 @@ async function handleEvent(event) {
 }
 
 // 設置 webhook 端點
-app.post('/webhook', line.middleware(config), (req, res) => {
+app.post('/callback', line.middleware(config), (req, res) => {
   Promise.all(req.body.events.map(handleEvent))
     .then((result) => res.json(result))
     .catch((err) => {
