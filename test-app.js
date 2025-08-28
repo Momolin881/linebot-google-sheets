@@ -1,8 +1,7 @@
 const express = require('express');
-require('dotenv').config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8080;
 
 console.log('🚀 開始啟動測試伺服器...');
 console.log('PORT 環境變數:', process.env.PORT);
@@ -31,7 +30,11 @@ app.post('/callback', (req, res) => {
   res.json({ message: 'callback endpoint works' });
 });
 
-app.listen(port, '0.0.0.0', () => {
-  console.log(`✅ 測試伺服器成功啟動在 0.0.0.0:${port}`);
-  console.log(`🌐 可以訪問: http://0.0.0.0:${port}`);
+const server = app.listen(port, () => {
+  console.log(`✅ 測試伺服器成功啟動在 port ${port}`);
+  console.log(`🌐 伺服器正在運行...`);
+});
+
+server.on('error', (err) => {
+  console.error('❌ 伺服器啟動失敗:', err);
 });
