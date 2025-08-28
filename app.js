@@ -13,6 +13,17 @@ const config = {
   channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
 
+// 檢查 LINE 環境變數
+if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) {
+  console.error('❌ LINE_CHANNEL_ACCESS_TOKEN 環境變數未設定');
+  process.exit(1);
+}
+if (!process.env.LINE_CHANNEL_SECRET) {
+  console.error('❌ LINE_CHANNEL_SECRET 環境變數未設定');
+  process.exit(1);
+}
+
+console.log('✅ LINE Bot 環境變數檢查通過');
 const client = new line.Client(config);
 // const googleSheetsService = new GoogleSheetsService();
 
