@@ -1,6 +1,7 @@
 const express = require('express');
 const line = require('@line/bot-sdk');
 const GoogleSheetsService = require('./googleSheets');
+const WhisperService = require('./whisperService');
 require('dotenv').config();
 
 const app = express();
@@ -12,7 +13,7 @@ const config = {
   channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
 
-// 檢查 LINE 環境變數
+// 檢查環境變數
 if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) {
   console.error('❌ LINE_CHANNEL_ACCESS_TOKEN 環境變數未設定');
   process.exit(1);
@@ -21,52 +22,111 @@ if (!process.env.LINE_CHANNEL_SECRET) {
   console.error('❌ LINE_CHANNEL_SECRET 環境變數未設定');
   process.exit(1);
 }
+if (!process.env.OPENAI_API_KEY) {
+  console.error('❌ OPENAI_API_KEY 環境變數未設定');
+  process.exit(1);
+}
 
-console.log('✅ LINE Bot 環境變數檢查通過');
+console.log('✅ 所有環境變數檢查通過');
 const client = new line.Client(config);
 const googleSheetsService = new GoogleSheetsService();
+const whisperService = new WhisperService();
 
 // 初始化 Google Sheets
 googleSheetsService.initializeSheet();
 
 // 處理 LINE Bot webhook
 async function handleEvent(event) {
-  if (event.type !== 'message' || event.message.type !== 'text') {
+  // 只處理訊息事件，且為文字或語音訊息
+  if (event.type !== 'message' || 
+      (event.message.type !== 'text' && event.message.type !== 'audio')) {
     return Promise.resolve(null);
   }
 
   try {
     // 取得使用者資訊
     const profile = await client.getProfile(event.source.userId);
-    
-    // 準備要儲存的資料
-    const data = {
-      userId: event.source.userId,
-      userName: profile.displayName || '未知使用者',
-      message: event.message.text
-    };
+    const userName = profile.displayName || '未知使用者';
+    const userId = event.source.userId;
+
+    let data;
+    let replyMessage;
+
+    if (event.message.type === 'text') {
+      // 處理文字訊息
+      console.log(`💬 收到 ${userName} 的文字訊息:`, event.message.text);
+      
+      data = {
+        type: 'text',
+        userId: userId,
+        userName: userName,
+        message: event.message.text
+      };
+
+      replyMessage = {
+        type: 'text',
+        text: `✅ 已成功儲存您的文字訊息：\n"${event.message.text}"`
+      };
+
+    } else if (event.message.type === 'audio') {
+      // 處理語音訊息
+      console.log(`🎤 收到 ${userName} 的語音訊息，開始轉換...`);
+      
+      // 先回覆處理中訊息
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '🎯 正在處理您的語音訊息，請稍候...'
+      });
+
+      // 使用 Whisper API 轉換語音為文字
+      const transcription = await whisperService.processAudioMessage(
+        event.message.id, 
+        process.env.LINE_CHANNEL_ACCESS_TOKEN
+      );
+
+      data = {
+        type: 'audio',
+        userId: userId,
+        userName: userName,
+        transcription: transcription,
+        duration: event.message.duration || '未知'
+      };
+
+      // 使用 push message 發送結果（因為已經用過 replyToken）
+      replyMessage = {
+        type: 'text',
+        text: `🎤 語音轉文字完成！\n\n📝 逐字稿：\n"${transcription}"\n\n✅ 已儲存到會議記錄`
+      };
+
+      // 語音訊息使用 push message
+      await client.pushMessage(userId, replyMessage);
+      replyMessage = null; // 避免重複發送
+    }
 
     // 儲存到 Google Sheets
     await googleSheetsService.appendData(data);
-    console.log('訊息已儲存到 Google Sheets:', data);
+    console.log('✅ 資料已儲存到 Google Sheets');
 
-    // 回覆確認訊息
-    const echo = {
-      type: 'text',
-      text: `✅ 已成功儲存您的訊息：\n"${event.message.text}"`
-    };
+    // 回覆訊息（僅文字訊息）
+    if (replyMessage) {
+      return client.replyMessage(event.replyToken, replyMessage);
+    }
 
-    return client.replyMessage(event.replyToken, echo);
   } catch (error) {
-    console.error('處理訊息時發生錯誤:', error);
+    console.error('❌ 處理訊息時發生錯誤:', error);
     
     // 回覆錯誤訊息
     const errorMessage = {
       type: 'text',
-      text: '❌ 儲存訊息時發生錯誤，請稍後再試。'
+      text: `❌ 處理${event.message.type === 'audio' ? '語音' : '文字'}訊息時發生錯誤，請稍後再試。\n錯誤: ${error.message}`
     };
     
-    return client.replyMessage(event.replyToken, errorMessage);
+    try {
+      return client.replyMessage(event.replyToken, errorMessage);
+    } catch (replyError) {
+      // 如果 replyToken 已使用過，嘗試用 push message
+      return client.pushMessage(event.source.userId, errorMessage);
+    }
   }
 }
 
