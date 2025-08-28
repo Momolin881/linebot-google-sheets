@@ -22,15 +22,29 @@ if (!process.env.LINE_CHANNEL_SECRET) {
   console.error('❌ LINE_CHANNEL_SECRET 環境變數未設定');
   process.exit(1);
 }
-if (!process.env.OPENAI_API_KEY) {
-  console.error('❌ OPENAI_API_KEY 環境變數未設定');
-  process.exit(1);
+
+// OpenAI API Key 是選用的（語音功能需要）
+const hasWhisperAPI = !!process.env.OPENAI_API_KEY;
+if (hasWhisperAPI) {
+  console.log('✅ OpenAI Whisper API 已啟用');
+} else {
+  console.log('⚠️ OpenAI API Key 未設定，語音轉文字功能將被停用');
 }
 
 console.log('✅ 所有環境變數檢查通過');
 const client = new line.Client(config);
 const googleSheetsService = new GoogleSheetsService();
-const whisperService = new WhisperService();
+
+// 只在有 OpenAI API Key 時初始化 Whisper 服務
+let whisperService = null;
+if (hasWhisperAPI) {
+  try {
+    whisperService = new WhisperService();
+  } catch (error) {
+    console.error('⚠️ Whisper 服務初始化失敗:', error.message);
+    console.log('🔄 將以純文字模式運行');
+  }
+}
 
 // 初始化 Google Sheets
 googleSheetsService.initializeSheet();
@@ -70,37 +84,71 @@ async function handleEvent(event) {
 
     } else if (event.message.type === 'audio') {
       // 處理語音訊息
-      console.log(`🎤 收到 ${userName} 的語音訊息，開始轉換...`);
+      console.log(`🎤 收到 ${userName} 的語音訊息`);
       
-      // 先回覆處理中訊息
-      await client.replyMessage(event.replyToken, {
-        type: 'text',
-        text: '🎯 正在處理您的語音訊息，請稍候...'
-      });
+      if (!whisperService) {
+        // 沒有 OpenAI API Key，無法處理語音
+        replyMessage = {
+          type: 'text',
+          text: '❌ 語音轉文字功能尚未啟用\n請設定 OPENAI_API_KEY 環境變數'
+        };
+        
+        data = {
+          type: 'audio',
+          userId: userId,
+          userName: userName,
+          transcription: '[語音轉文字功能未啟用]',
+          duration: event.message.duration || '未知'
+        };
+      } else {
+        try {
+          // 先回覆處理中訊息
+          await client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: '🎯 正在處理您的語音訊息，請稍候...'
+          });
 
-      // 使用 Whisper API 轉換語音為文字
-      const transcription = await whisperService.processAudioMessage(
-        event.message.id, 
-        process.env.LINE_CHANNEL_ACCESS_TOKEN
-      );
+          // 使用 Whisper API 轉換語音為文字
+          const transcription = await whisperService.processAudioMessage(
+            event.message.id, 
+            process.env.LINE_CHANNEL_ACCESS_TOKEN
+          );
 
-      data = {
-        type: 'audio',
-        userId: userId,
-        userName: userName,
-        transcription: transcription,
-        duration: event.message.duration || '未知'
-      };
+          data = {
+            type: 'audio',
+            userId: userId,
+            userName: userName,
+            transcription: transcription,
+            duration: event.message.duration || '未知'
+          };
 
-      // 使用 push message 發送結果（因為已經用過 replyToken）
-      replyMessage = {
-        type: 'text',
-        text: `🎤 語音轉文字完成！\n\n📝 逐字稿：\n"${transcription}"\n\n✅ 已儲存到會議記錄`
-      };
+          // 使用 push message 發送結果（因為已經用過 replyToken）
+          replyMessage = {
+            type: 'text',
+            text: `🎤 語音轉文字完成！\n\n📝 逐字稿：\n"${transcription}"\n\n✅ 已儲存到會議記錄`
+          };
 
-      // 語音訊息使用 push message
-      await client.pushMessage(userId, replyMessage);
-      replyMessage = null; // 避免重複發送
+          // 語音訊息使用 push message
+          await client.pushMessage(userId, replyMessage);
+          replyMessage = null; // 避免重複發送
+          
+        } catch (whisperError) {
+          console.error('❌ 語音處理失敗:', whisperError);
+          
+          data = {
+            type: 'audio',
+            userId: userId,
+            userName: userName,
+            transcription: '[語音轉文字處理失敗]',
+            duration: event.message.duration || '未知'
+          };
+
+          replyMessage = {
+            type: 'text',
+            text: `❌ 語音轉文字失敗\n錯誤: ${whisperError.message}`
+          };
+        }
+      }
     }
 
     // 儲存到 Google Sheets
