@@ -26,6 +26,12 @@ class GoogleSheetsService {
     
     this.sheets = google.sheets({ version: 'v4', auth: this.auth });
     this.spreadsheetId = process.env.GOOGLE_SHEETS_ID;
+    
+    // 檢查 spreadsheetId
+    if (!this.spreadsheetId) {
+      throw new Error('GOOGLE_SHEETS_ID 環境變數未設定或為空');
+    }
+    console.log('✅ Google Sheets ID 設定正確:', this.spreadsheetId);
   }
 
   async appendData(data) {
