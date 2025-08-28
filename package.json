@@ -4,9 +4,9 @@
   "description": "LINE Bot that stores text messages to Google Sheets",
   "main": "app.js",
   "scripts": {
-    "start": "node test-app.js",
+    "start": "node app.js",
     "dev": "nodemon app.js",
-    "original": "node app.js"
+    "test": "node test-app.js"
   },
   "dependencies": {
     "express": "^4.18.2",
