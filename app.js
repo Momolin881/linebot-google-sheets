@@ -93,7 +93,8 @@ app.get('/', (req, res) => {
   });
 });
 
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`🤖 LINE Bot 伺服器啟動在 port ${port}`);
   console.log(`📊 Google Sheets ID: ${process.env.GOOGLE_SHEETS_ID || '未設定'}`);
+  console.log(`🌐 伺服器監聽在 0.0.0.0:${port}`);
 });
