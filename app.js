@@ -49,12 +49,30 @@ if (hasWhisperAPI) {
 // 初始化 Google Sheets
 googleSheetsService.initializeSheet();
 
+// 防重複處理的訊息 ID 記錄
+const processedMessages = new Set();
+
 // 處理 LINE Bot webhook
 async function handleEvent(event) {
   // 只處理訊息事件，且為文字或語音訊息
   if (event.type !== 'message' || 
       (event.message.type !== 'text' && event.message.type !== 'audio')) {
     return Promise.resolve(null);
+  }
+
+  // 防重複處理
+  if (processedMessages.has(event.message.id)) {
+    console.log('⚠️ 訊息已處理過，跳過:', event.message.id);
+    return Promise.resolve(null);
+  }
+  
+  // 標記為已處理
+  processedMessages.add(event.message.id);
+  
+  // 清理舊的訊息記錄（保留最近 1000 筆）
+  if (processedMessages.size > 1000) {
+    const oldMessages = Array.from(processedMessages).slice(0, 500);
+    oldMessages.forEach(id => processedMessages.delete(id));
   }
 
   try {
@@ -161,19 +179,25 @@ async function handleEvent(event) {
     }
 
   } catch (error) {
-    console.error('❌ 處理訊息時發生錯誤:', error);
+    console.error('❌ 處理訊息時發生錯誤:', error.message);
+    console.error('錯誤詳情:', {
+      messageType: event.message.type,
+      messageId: event.message.id,
+      userId: event.source.userId,
+      errorCode: error.status || error.code
+    });
     
-    // 回覆錯誤訊息
-    const errorMessage = {
-      type: 'text',
-      text: `❌ 處理${event.message.type === 'audio' ? '語音' : '文字'}訊息時發生錯誤，請稍後再試。\n錯誤: ${error.message}`
-    };
-    
+    // 簡化錯誤回覆，避免過多 API 呼叫
     try {
+      const errorMessage = {
+        type: 'text',
+        text: `❌ 處理${event.message.type === 'audio' ? '語音' : '文字'}訊息時發生錯誤`
+      };
+      
       return client.replyMessage(event.replyToken, errorMessage);
     } catch (replyError) {
-      // 如果 replyToken 已使用過，嘗試用 push message
-      return client.pushMessage(event.source.userId, errorMessage);
+      console.error('❌ 回覆錯誤訊息也失敗:', replyError.message);
+      // 不再嘗試 push message，避免更多錯誤
     }
   }
 }
